@@ -17,26 +17,40 @@ export default function Progress({ progress }: ProgressProps) {
   const percent = getProgressPercent()
 
   return (
-    <div className="mt-8 p-6 bg-dark-800/50 border border-dark-700/50 rounded-2xl">
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-sm font-medium text-dark-300">Downloading...</span>
-        <span className="text-sm font-semibold text-emerald-400">
+    <div className="swiss-card" style={{ 
+      padding: '16px', 
+      backgroundColor: '#FFFFFF',
+      boxShadow: '0 1px 5px rgba(0,0,0,0.04)'
+    }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+        <span className="swiss-type-small" style={{ fontWeight: '500', color: '#4B5563' }}>Downloading</span>
+        <span className="swiss-type-small" style={{ fontWeight: '600', color: '#2563EB' }}>
           {percent > 0 ? `${percent.toFixed(1)}%` : ''}
         </span>
       </div>
 
-      {/* Progress Bar */}
-      <div className="h-2 bg-dark-700 rounded-full overflow-hidden mb-4">
-        <div
-          className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all duration-300"
-          style={{ width: `${percent > 0 ? percent : 5}%` }}
+      {/* Progress Bar - Soft Blue */}
+      <div className="swiss-progress" style={{ marginBottom: '12px' }}>
+        <div 
+          className="swiss-progress-bar" 
+          style={{ 
+            width: `${percent > 0 ? percent : 5}%`,
+            backgroundColor: '#2563EB'
+          }}
         />
       </div>
 
-      {/* Status */}
-      <div className="space-y-1">
-        <p className="text-sm text-dark-400 truncate">{progress.filename}</p>
-      </div>
+      {/* Status Text */}
+      <p className="swiss-type-small" style={{ 
+        color: '#9CA3AF', 
+        margin: 0,
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap'
+      }}>
+        {progress.filename}
+      </p>
     </div>
   )
 }

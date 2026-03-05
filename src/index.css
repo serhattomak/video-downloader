@@ -1,41 +1,339 @@
+/* Soft Swiss Design System - Eye Friendly */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-* {
+/* CSS Reset & Base */
+*, *::before, *::after {
   box-sizing: border-box;
-}
-
-html, body, #root {
-  height: 100%;
   margin: 0;
   padding: 0;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-::-webkit-scrollbar-track {
-  background: #1e293b;
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: #FAFAFA;
+  color: #1F2937;
+  line-height: 1.5;
+  min-height: 100vh;
 }
 
-::-webkit-scrollbar-thumb {
-  background: #475569;
+/* Soft Color Variables */
+:root {
+  --bg-primary: #FAFAFA;
+  --bg-secondary: #F5F5F5;
+  --bg-card: #FFFFFF;
+  --text-primary: #1F2937;
+  --text-secondary: #4B5563;
+  --text-muted: #9CA3AF;
+  --border-default: #E5E7EB;
+  --border-hover: #D1D5DB;
+  --accent-primary: #2563EB;
+  --accent-hover: #1D4ED8;
+  --accent-light: #DBEAFE;
+}
+
+/* Swiss Design Principles */
+
+/* 1. Grid Alignment */
+.swiss-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 24px;
+}
+
+/* 2. Typography Scale - Modular Scale */
+.swiss-type-display {
+  font-size: 3rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  color: var(--text-primary);
+}
+
+.swiss-type-h1 {
+  font-size: 2.25rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  color: var(--text-primary);
+}
+
+.swiss-type-h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  color: var(--text-primary);
+}
+
+.swiss-type-h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+
+.swiss-type-body {
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+
+.swiss-type-small {
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.swiss-type-caption {
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+/* 3. Whitespace */
+.swiss-space-xs { padding: 4px; }
+.swiss-space-sm { padding: 8px; }
+.swiss-space-md { padding: 16px; }
+.swiss-space-lg { padding: 24px; }
+.swiss-space-xl { padding: 48px; }
+.swiss-space-2xl { padding: 64px; }
+
+/* 4. Minimal Borders */
+.swiss-border {
+  border: 1px solid var(--border-default);
+}
+
+.swiss-border-thick {
+  border: 2px solid var(--text-primary);
+}
+
+/* 5. Interactive States */
+.swiss-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 24px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-radius: 6px;
+}
+
+.swiss-button-primary {
+  background-color: var(--text-primary);
+  color: var(--bg-card);
+}
+
+.swiss-button-primary:hover {
+  background-color: #374151;
+}
+
+.swiss-button-primary:active {
+  background-color: #4B5563;
+}
+
+/* Soft Primary Button Variant */
+.swiss-button-soft {
+  background-color: var(--accent-primary);
+  color: var(--bg-card);
+}
+
+.swiss-button-soft:hover {
+  background-color: var(--accent-hover);
+}
+
+.swiss-button-secondary {
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+}
+
+.swiss-button-secondary:hover {
+  border-color: var(--border-hover);
+  background-color: var(--bg-secondary);
+}
+
+/* 6. Input Fields */
+.swiss-input {
+  width: 100%;
+  padding: 14px 16px;
+  font-size: 1rem;
+  font-weight: 400;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  color: var(--text-primary);
+}
+
+.swiss-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.swiss-input::placeholder {
+  color: var(--text-muted);
+}
+
+.swiss-input:disabled {
+  background-color: var(--bg-secondary);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* 7. Cards */
+.swiss-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  padding: 24px;
+  transition: all 0.2s ease;
+}
+
+.swiss-card-hover:hover {
+  border-color: var(--border-hover);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+/* 8. Dividers */
+.swiss-divider {
+  height: 1px;
+  background-color: var(--border-default);
+  width: 100%;
+}
+
+/* 9. Status Indicators */
+.swiss-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
   border-radius: 4px;
 }
 
+.swiss-badge-success {
+  background-color: #D1FAE5;
+  color: #065F46;
+}
+
+.swiss-badge-warning {
+  background-color: #FEF3C7;
+  color: #92400E;
+}
+
+.swiss-badge-error {
+  background-color: #FEE2E2;
+  color: #991B1B;
+}
+
+/* 10. Progress Bar */
+.swiss-progress {
+  width: 100%;
+  height: 6px;
+  background-color: var(--bg-secondary);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.swiss-progress-bar {
+  height: 100%;
+  background-color: var(--accent-primary);
+  transition: width 0.3s ease;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-hover);
+  border-radius: 3px;
+}
+
 ::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
+  background: var(--text-muted);
 }
 
-/* Smooth transitions */
-.transition-base {
-  transition: all 0.2s ease-in-out;
+/* Selection */
+::selection {
+  background-color: var(--accent-primary);
+  color: var(--bg-card);
 }
 
-/* Focus ring */
-input:focus, button:focus {
-  outline: none;
+/* Focus Visible */
+:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* Animations */
+@keyframes swiss-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.swiss-animate-fade-in {
+  animation: swiss-fade-in 0.3s ease forwards;
+}
+
+/* Utility Classes */
+.swiss-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.swiss-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.swiss-flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.swiss-flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Smooth Page Background */
+.page-background {
+  background: linear-gradient(180deg, #FAFAFA 0%, #F5F5F5 100%);
+  min-height: 100vh;
 }

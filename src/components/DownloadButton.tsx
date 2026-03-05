@@ -14,17 +14,25 @@ export default function DownloadButton({ onClick, isLoading, outputPath, onPathC
   }
 
   return (
-    <div className="mt-8 space-y-4">
-      {/* Output Path */}
-      <div>
-        <label className="block text-sm font-medium text-dark-400 mb-2">
+    <div>
+      {/* Output Path Section */}
+      <div style={{ marginBottom: '16px' }}>
+        <label className="swiss-type-caption" style={{ display: 'block', marginBottom: '8px', color: '#6B7280' }}>
           Download Location
         </label>
-        <div className="flex gap-3">
-          <div className="flex-1 relative">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <svg className="w-5 h-5 text-dark-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+        
+        <div style={{ display: 'flex', gap: '10px' }}>
+          {/* Path Input */}
+          <div style={{ flex: 1, position: 'relative' }}>
+            <div style={{ 
+              position: 'absolute', 
+              left: '14px', 
+              top: '50%', 
+              transform: 'translateY(-50%)',
+              pointerEvents: 'none'
+            }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
               </svg>
             </div>
             <input
@@ -32,57 +40,123 @@ export default function DownloadButton({ onClick, isLoading, outputPath, onPathC
               value={outputPath}
               onChange={(e) => onPathChange(e.target.value)}
               disabled={isLoading}
-              className="w-full pl-12 pr-4 py-3 bg-dark-800 border border-dark-600 rounded-xl text-dark-100 placeholder-dark-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition-all disabled:opacity-50"
+              className="swiss-input"
+              style={{ 
+                paddingLeft: '40px',
+                borderRadius: '8px',
+                backgroundColor: '#FFFFFF',
+                color: '#1F2937',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+              }}
             />
           </div>
+          
+          {/* Select Folder Button */}
           <button
             type="button"
             onClick={onSelectDirectory}
             disabled={isLoading}
-            className="px-4 py-3 bg-dark-700 hover:bg-dark-600 border border-dark-600 rounded-xl transition-colors disabled:opacity-50"
+            style={{
+              padding: '12px 14px',
+              backgroundColor: '#FFFFFF',
+              border: '1px solid #E5E7EB',
+              borderRadius: '8px',
+              cursor: isLoading ? 'not-allowed' : 'pointer',
+              opacity: isLoading ? 0.6 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+              transition: 'all 0.2s ease'
+            }}
             title="Select folder"
           >
-            <svg className="w-5 h-5 text-dark-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
             </svg>
           </button>
+          
+          {/* Open Folder Button */}
           <button
             type="button"
             onClick={handleOpenFolder}
             disabled={isLoading || !outputPath}
-            className="px-4 py-3 bg-indigo-600 hover:bg-indigo-700 border border-indigo-500 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              padding: '12px 14px',
+              backgroundColor: '#FFFFFF',
+              border: '1px solid #E5E7EB',
+              borderRadius: '8px',
+              cursor: (isLoading || !outputPath) ? 'not-allowed' : 'pointer',
+              opacity: (isLoading || !outputPath) ? 0.6 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+              transition: 'all 0.2s ease'
+            }}
             title="Open folder"
+            onMouseEnter={(e) => {
+              if (!isLoading && outputPath) {
+                e.currentTarget.style.borderColor = '#2563EB'
+                e.currentTarget.style.backgroundColor = '#DBEAFE'
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = '#E5E7EB'
+              e.currentTarget.style.backgroundColor = '#FFFFFF'
+            }}
           >
-            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
             </svg>
           </button>
         </div>
       </div>
 
-      {/* Download Button */}
+      {/* Download Button - Soft Blue Primary */}
       <button
         onClick={onClick}
         disabled={isLoading || !outputPath}
-        className="w-full py-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 disabled:from-dark-600 disabled:to-dark-600 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="swiss-button swiss-button-soft"
+        style={{ 
+          width: '100%',
+          padding: '16px 24px',
+          fontSize: '1rem',
+          fontWeight: '600',
+          borderRadius: '8px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '10px',
+          cursor: (isLoading || !outputPath) ? 'not-allowed' : 'pointer',
+          opacity: (isLoading || !outputPath) ? 0.6 : 1,
+          boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)'
+        }}
       >
         {isLoading ? (
           <>
-            <svg className="w-6 h-6 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+              <circle cx="12" cy="12" r="10" strokeOpacity="0.25"></circle>
+              <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"></path>
             </svg>
             <span>Downloading...</span>
           </>
         ) : (
           <>
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
             <span>Download Video</span>
           </>
         )}
       </button>
+
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   )
 }
