@@ -1,11 +1,12 @@
 {
   "name": "video-downloader",
   "version": "1.0.0",
-  "description": "Modern Video Downloader for YouTube, X, Instagram and more",
+  "description": "Video Downloader - Download videos from YouTube, X, Instagram, TikTok, Facebook",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build && electron-builder",
+    "build:portable": "tsc && vite build && electron-builder --win portable",
     "preview": "vite preview"
   },
   "author": "Video Downloader",
@@ -32,8 +33,10 @@
   "build": {
     "appId": "com.videodownloader.app",
     "productName": "Video Downloader",
+    "copyright": "Copyright 2024",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "build"
     },
     "asar": false,
     "win": {
@@ -41,17 +44,37 @@
         {
           "target": "nsis",
           "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
         }
-      ]
+      ],
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Video Downloader"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-Portable.${ext}"
     },
     "files": [
       "dist/**/*",
-      "dist-electron/**/*"
+      "dist-electron/**/*",
+      "!node_modules/**/*",
+      "node_modules/electron-log/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/",
+        "to": "resources/",
+        "filter": ["**/*"]
+      }
     ]
   }
 }

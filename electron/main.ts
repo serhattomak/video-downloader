@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron'
 import path from 'path'
-import { spawn } from 'child_process'
+import fs from 'fs'
+import { spawn, execSync } from 'child_process'
 import log from 'electron-log'
 
 // Configure logging
@@ -18,7 +19,6 @@ process.on('unhandledRejection', (reason) => {
 })
 
 // Check if running in production
-// Use NODE_ENV or check if we're in the release folder
 const isDev = process.env.NODE_ENV === 'development' || 
               (!app.isPackaged && !process.execPath.includes('release'))
 
@@ -29,6 +29,14 @@ function getBasePath() {
   }
   // In production, the app.asar is in resources folder
   return path.join(__dirname, '..')
+}
+
+// Get resources path
+function getResourcesPath() {
+  if (isDev) {
+    return path.join(process.cwd(), 'resources')
+  }
+  return path.join(getBasePath(), 'resources')
 }
 
 let mainWindow: BrowserWindow | null = null
@@ -44,16 +52,16 @@ function createWindow() {
   
   mainWindow = new BrowserWindow({
     width: 900,
-    height: 650,
+    height: 680,
     minWidth: 700,
-    minHeight: 500,
+    minHeight: 550,
     title: 'Video Downloader',
-    backgroundColor: '#0f172a',
+    backgroundColor: '#FAFAFA',
     webPreferences: {
       preload: preloadPath,
       nodeIntegration: false,
       contextIsolation: true,
-      webSecurity: false // Disable for local file loading
+      webSecurity: false
     },
     show: false
   })
@@ -67,30 +75,21 @@ function createWindow() {
     mainWindow.loadURL('http://localhost:5173')
     mainWindow.webContents.openDevTools()
   } else {
-    // In production (without asar), load from resources/app/dist
-    // __dirname in production is: .../resources/app/dist-electron
     const distPath = path.join(__dirname, '..', 'dist', 'index.html')
     log.info('Loading production HTML from:', distPath)
     
-    // Try to load the file and check for errors
     mainWindow.loadFile(distPath).then(() => {
       log.info('HTML loaded successfully')
     }).catch((err) => {
       log.error('Failed to load file:', err)
     })
     
-    // Also log any webContents errors
     mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
       log.error('Failed to load:', errorCode, errorDescription)
     })
     
     mainWindow.webContents.on('render-process-gone', (event, details) => {
       log.error('Renderer process gone:', details)
-    })
-    
-    // Log console errors from renderer
-    mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
-      log.info('Console:', message)
     })
   }
 
@@ -118,12 +117,33 @@ app.on('window-all-closed', () => {
   }
 })
 
+// ============================================
+// yt-dlp Installation & Management
+// ============================================
+
+// Get yt-dlp path
+function getYtDlpPath(): string {
+  // Check for bundled yt-dlp in app directory
+  const appDir = isDev 
+    ? path.join(process.cwd(), 'resources')
+    : path.join(__dirname, '..')
+  
+  const bundledPath = path.join(appDir, 'yt-dlp.exe')
+  if (fs.existsSync(bundledPath)) {
+    log.info('Using bundled yt-dlp:', bundledPath)
+    return bundledPath
+  }
+  
+  // Fallback to system PATH
+  return 'yt-dlp'
+}
+
 // Check if yt-dlp is installed
 ipcMain.handle('check-yt-dlp', async () => {
   return new Promise((resolve) => {
-    // Try different commands
+    const ytDlpPath = getYtDlpPath()
     const commands = [
-      { cmd: 'yt-dlp', args: ['--version'] },
+      { cmd: ytDlpPath, args: ['--version'] },
       { cmd: 'python', args: ['-m', 'yt_dlp', '--version'] },
       { cmd: 'python3', args: ['-m', 'yt_dlp', '--version'] }
     ]
@@ -139,6 +159,7 @@ ipcMain.handle('check-yt-dlp', async () => {
       
       proc.on('close', (code) => {
         if (code === 0) {
+          log.info('yt-dlp found:', cmd)
           resolve(true)
         } else {
           tryCommand(index + 1)
@@ -156,7 +177,8 @@ ipcMain.handle('check-yt-dlp', async () => {
 // Install yt-dlp
 ipcMain.handle('install-yt-dlp', async () => {
   return new Promise((resolve, reject) => {
-    const proc = spawn('python', ['-m', 'pip', 'install', 'yt-dlp', '--upgrade'], { shell: true })
+    // Try pip install first
+    const proc = spawn('python', ['-m', 'pip', 'install', 'yt-dlp', '--upgrade', '--user'], { shell: true })
     let output = ''
     
     proc.stdout.on('data', (data) => {
@@ -169,11 +191,26 @@ ipcMain.handle('install-yt-dlp', async () => {
     
     proc.on('close', (code) => {
       if (code === 0) {
-        log.info('yt-dlp installed')
+        log.info('yt-dlp installed via pip')
         resolve('yt-dlp installed successfully')
       } else {
-        log.error('Failed to install yt-dlp:', output)
-        reject(new Error(output || 'Failed to install yt-dlp'))
+        // Try winget as fallback
+        log.info('pip install failed, trying winget...')
+        const wingetProc = spawn('winget', ['install', 'yt-dlp.yt-dlp', '-e', '--source', 'winget'], { shell: true })
+        
+        wingetProc.on('close', (wingetCode) => {
+          if (wingetCode === 0) {
+            resolve('yt-dlp installed via winget')
+          } else {
+            // Manual download as last resort
+            log.info('winget failed, trying manual download...')
+            reject(new Error('Could not install yt-dlp automatically. Please install yt-dlp manually.'))
+          }
+        })
+        
+        wingetProc.on('error', () => {
+          reject(new Error('Could not install yt-dlp automatically. Please install yt-dlp manually.'))
+        })
       }
     })
     
@@ -187,7 +224,14 @@ ipcMain.handle('install-yt-dlp', async () => {
 // Get video info
 ipcMain.handle('get-video-info', async (_, url: string) => {
   return new Promise((resolve, reject) => {
-    const proc = spawn('python', ['-m', 'yt_dlp', '--dump-json', '--no-download', '--no-check-certificate', url], { shell: true })
+    const ytDlpPath = getYtDlpPath()
+    const args = ['--dump-json', '--no-download', '--no-check-certificate', url]
+    
+    // Add path if using bundled exe
+    const cmd = ytDlpPath.includes('yt-dlp') && !ytDlpPath.endsWith('.exe') ? 'python' : ytDlpPath
+    const procArgs = ytDlpPath.includes('yt-dlp') && !ytDlpPath.endsWith('.exe') ? ['-m', 'yt_dlp', ...args] : args
+    
+    const proc = spawn(cmd, procArgs, { shell: true })
     let output = ''
     let errorOutput = ''
 
@@ -204,7 +248,6 @@ ipcMain.handle('get-video-info', async (_, url: string) => {
         try {
           const json = JSON.parse(output)
           
-          // Detect platform
           const urlLower = url.toLowerCase()
           let platform = 'Unknown'
           if (urlLower.includes('youtube.com') || urlLower.includes('youtu.be')) {
@@ -232,7 +275,7 @@ ipcMain.handle('get-video-info', async (_, url: string) => {
             duration,
             uploader,
             platform,
-            formats: [] // Will be populated by format list
+            formats: []
           })
         } catch (err) {
           reject(new Error('Failed to parse video info'))
@@ -250,9 +293,14 @@ ipcMain.handle('get-video-info', async (_, url: string) => {
 
 // Get available formats
 ipcMain.handle('get-formats', async (_, url: string) => {
-  return new Promise((resolve, reject) => {
-    // Add --no-check-certificate to handle certificate issues
-    const proc = spawn('python', ['-m', 'yt_dlp', '-F', '--no-check-certificate', url], { shell: true })
+  return new Promise((resolve) => {
+    const ytDlpPath = getYtDlpPath()
+    const args = ['-F', '--no-check-certificate', url]
+    
+    const cmd = ytDlpPath.includes('yt-dlp') && !ytDlpPath.endsWith('.exe') ? 'python' : ytDlpPath
+    const procArgs = ytDlpPath.includes('yt-dlp') && !ytDlpPath.endsWith('.exe') ? ['-m', 'yt_dlp', ...args] : args
+    
+    const proc = spawn(cmd, procArgs, { shell: true })
     let output = ''
 
     proc.stdout.on('data', (data) => {
@@ -269,36 +317,28 @@ ipcMain.handle('get-formats', async (_, url: string) => {
         const formats: Array<{format_id: string, ext: string, resolution: string, filesize: string, note?: string}> = []
         
         for (const line of lines) {
-          // Parse format lines - be more flexible
           if (line.length > 40 && /^\d/.test(line)) {
-            // Extract format ID (first number)
             const formatMatch = line.match(/^(\d+)/)
             if (!formatMatch) continue
             
             const formatId = formatMatch[1]
-            
-            // Extract extension
             const extMatch = line.match(/\s(mp4|webm|m4a|mp3|aac|ogg)\s/i)
             const ext = extMatch ? extMatch[1].toLowerCase() : 'unknown'
             
-            // Extract resolution
             const resMatch = line.match(/(\d+x\d+|\d+p)/i)
             const resolution = resMatch ? resMatch[1] : (ext === 'm4a' || ext === 'mp3' ? 'Audio' : 'Unknown')
             
-            // Extract filesize
             const sizeMatch = line.match(/(\d+\.?\d*\s*[KMGT]iB?)/i)
             const filesize = sizeMatch ? sizeMatch[1] : 'Unknown'
             
-            // Extract note if present
             const noteMatch = line.match(/\[(.*?)\]/)
             const note = noteMatch ? noteMatch[1] : ''
             
-            // Include all video/audio formats
             if (['mp4', 'webm', 'm4a', 'mp3', 'aac', 'ogg'].includes(ext)) {
               formats.push({
                 format_id: formatId,
                 ext,
-                resolution: resolution === 'Audio' || resolution.match(/^\d+p$/) ? resolution : resolution,
+                resolution,
                 filesize,
                 note
               })
@@ -309,7 +349,6 @@ ipcMain.handle('get-formats', async (_, url: string) => {
         resolve(formats.slice(0, 25))
       } else {
         log.error('Get formats failed:', output)
-        // Return empty array instead of rejecting - we can still try to download
         resolve([])
       }
     })
@@ -325,16 +364,13 @@ ipcMain.handle('get-formats', async (_, url: string) => {
 ipcMain.handle('download-video', async (_, options: { url: string, formatId: string, outputDir: string }) => {
   const { url, formatId, outputDir } = options
   
-  // Check if it's X/Twitter URL
   const isX = url.toLowerCase().includes('twitter.com') || url.toLowerCase().includes('x.com')
   
   return new Promise((resolve, reject) => {
-    // Build yt-dlp arguments based on format selection
+    const ytDlpPath = getYtDlpPath()
     let args: string[]
     
     if (formatId === 'best' || formatId === 'bestvideo') {
-      // Best quality - simple and reliable
-      // For X/Twitter, use a more flexible format selector
       if (isX) {
         args = [
           '-f', 'bestvideo+bestaudio/best',
@@ -356,7 +392,6 @@ ipcMain.handle('download-video', async (_, options: { url: string, formatId: str
         ]
       }
     } else if (formatId === 'bestaudio') {
-      // Audio only
       args = [
         '-f', 'bestaudio',
         '--no-check-certificate',
@@ -366,7 +401,6 @@ ipcMain.handle('download-video', async (_, options: { url: string, formatId: str
         url
       ]
     } else {
-      // Specific format - use as-is
       args = [
         '-f', formatId,
         '--no-check-certificate',
@@ -379,8 +413,10 @@ ipcMain.handle('download-video', async (_, options: { url: string, formatId: str
 
     log.info('Starting download:', args)
 
-    // Use full path to python to ensure ffmpeg is found
-    const proc = spawn('python', ['-m', 'yt_dlp', ...args], { 
+    const cmd = ytDlpPath.includes('yt-dlp') && !ytDlpPath.endsWith('.exe') ? 'python' : ytDlpPath
+    const procArgs = ytDlpPath.includes('yt-dlp') && !ytDlpPath.endsWith('.exe') ? ['-m', 'yt_dlp', ...args] : args
+    
+    const proc = spawn(cmd, procArgs, { 
       shell: true,
       env: { ...process.env, PYTHONPATH: '' } 
     })
@@ -389,17 +425,14 @@ ipcMain.handle('download-video', async (_, options: { url: string, formatId: str
       const line = data.toString().trim()
       log.info('Download:', line)
       
-      // Send progress to renderer
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('download-progress', { filename: line })
         
-        // Check for merging
         if (line.includes('Merging') || line.includes('Destination:')) {
           log.info('Merging formats...')
           mainWindow.webContents.send('download-progress', { filename: 'Merging video and audio...' })
         }
         
-        // Check for completion
         if (line.includes('Deleting') || line.includes('Merging') || line.includes('Fixing')) {
           mainWindow.webContents.send('download-complete', 'Download complete!')
         }
@@ -457,4 +490,3 @@ ipcMain.handle('open-folder', async (_, folderPath: string) => {
     return false
   }
 })
-
