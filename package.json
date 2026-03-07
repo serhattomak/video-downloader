@@ -1,6 +1,6 @@
 {
   "name": "video-downloader",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Video Downloader - Download videos from YouTube, X, Instagram, TikTok, Facebook",
   "main": "dist-electron/main.js",
   "scripts": {
@@ -13,6 +13,7 @@
   "license": "MIT",
   "dependencies": {
     "electron-log": "^5.2.4",
+    "electron-store": "^11.0.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
@@ -42,23 +43,12 @@
     "win": {
       "target": [
         {
-          "target": "nsis",
-          "arch": ["x64"]
-        },
-        {
           "target": "portable",
           "arch": ["x64"]
         }
       ],
-      "artifactName": "${productName}-${version}-${arch}.${ext}"
-    },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "Video Downloader"
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "signingHashAlgorithms": []
     },
     "portable": {
       "artifactName": "${productName}-${version}-Portable.${ext}"
@@ -67,14 +57,15 @@
       "dist/**/*",
       "dist-electron/**/*",
       "!node_modules/**/*",
-      "node_modules/electron-log/**/*"
-    ],
-    "extraResources": [
-      {
-        "from": "resources/",
-        "to": "resources/",
-        "filter": ["**/*"]
-      }
+      "node_modules/electron-log/**/*",
+      "node_modules/electron-store/**/*",
+      "node_modules/conf/**/*",
+      "node_modules/atomically/**/*",
+      "node_modules/env-paths/**/*",
+      "node_modules/ajv/**/*",
+      "node_modules/ajv-formats/**/*",
+      "node_modules/json-schema-traverse/**/*",
+      "node_modules/fast-deep-equal/**/*"
     ]
   }
 }

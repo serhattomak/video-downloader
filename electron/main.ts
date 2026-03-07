@@ -1,10 +1,13 @@
 import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron'
 import path from 'path'
 import fs from 'fs'
-import { spawn, execSync } from 'child_process'
+import { spawn } from 'child_process'
 import log from 'electron-log'
+import Store from 'electron-store'
 
+// ============================================
 // Configure logging
+// ============================================
 log.transports.file.level = 'info'
 log.transports.console.level = 'debug'
 
@@ -18,26 +21,71 @@ process.on('unhandledRejection', (reason) => {
   log.error('Unhandled Rejection:', reason)
 })
 
+// ============================================
+// Store for History and Favorites
+// ============================================
+interface HistoryItem {
+  id: string
+  url: string
+  title: string
+  thumbnail: string
+  platform: string
+  format: string
+  filePath: string
+  fileSize?: number
+  downloadedAt: string
+}
+
+interface FavoriteItem {
+  id: string
+  url: string
+  title: string
+  thumbnail: string
+  platform: string
+  addedAt: string
+}
+
+interface StoreSchema {
+  history: HistoryItem[]
+  favorites: FavoriteItem[]
+}
+
+const store = new Store<StoreSchema>({
+  defaults: {
+    history: [],
+    favorites: []
+  }
+})
+
+// ============================================
+// Helper Functions
+// ============================================
+
 // Check if running in production
 const isDev = process.env.NODE_ENV === 'development' || 
               (!app.isPackaged && !process.execPath.includes('release'))
 
-// Get the correct base path for resources
 function getBasePath() {
   if (isDev) {
     return process.cwd()
   }
-  // In production, the app.asar is in resources folder
   return path.join(__dirname, '..')
 }
 
-// Get resources path
 function getResourcesPath() {
   if (isDev) {
     return path.join(process.cwd(), 'resources')
   }
   return path.join(getBasePath(), 'resources')
 }
+
+function generateId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2)
+}
+
+// ============================================
+// Window Management
+// ============================================
 
 let mainWindow: BrowserWindow | null = null
 
@@ -47,7 +95,6 @@ function createWindow() {
   log.info('Is dev:', isDev)
   
   const preloadPath = path.join(__dirname, 'preload.js')
-    
   log.info('Preload path:', preloadPath)
   
   mainWindow = new BrowserWindow({
@@ -121,9 +168,7 @@ app.on('window-all-closed', () => {
 // yt-dlp Installation & Management
 // ============================================
 
-// Get yt-dlp path
 function getYtDlpPath(): string {
-  // Check for bundled yt-dlp in app directory
   const appDir = isDev 
     ? path.join(process.cwd(), 'resources')
     : path.join(__dirname, '..')
@@ -134,11 +179,9 @@ function getYtDlpPath(): string {
     return bundledPath
   }
   
-  // Fallback to system PATH
   return 'yt-dlp'
 }
 
-// Check if yt-dlp is installed
 ipcMain.handle('check-yt-dlp', async () => {
   return new Promise((resolve) => {
     const ytDlpPath = getYtDlpPath()
@@ -174,10 +217,8 @@ ipcMain.handle('check-yt-dlp', async () => {
   })
 })
 
-// Install yt-dlp
 ipcMain.handle('install-yt-dlp', async () => {
   return new Promise((resolve, reject) => {
-    // Try pip install first
     const proc = spawn('python', ['-m', 'pip', 'install', 'yt-dlp', '--upgrade', '--user'], { shell: true })
     let output = ''
     
@@ -194,7 +235,6 @@ ipcMain.handle('install-yt-dlp', async () => {
         log.info('yt-dlp installed via pip')
         resolve('yt-dlp installed successfully')
       } else {
-        // Try winget as fallback
         log.info('pip install failed, trying winget...')
         const wingetProc = spawn('winget', ['install', 'yt-dlp.yt-dlp', '-e', '--source', 'winget'], { shell: true })
         
@@ -202,7 +242,6 @@ ipcMain.handle('install-yt-dlp', async () => {
           if (wingetCode === 0) {
             resolve('yt-dlp installed via winget')
           } else {
-            // Manual download as last resort
             log.info('winget failed, trying manual download...')
             reject(new Error('Could not install yt-dlp automatically. Please install yt-dlp manually.'))
           }
@@ -221,13 +260,15 @@ ipcMain.handle('install-yt-dlp', async () => {
   })
 })
 
-// Get video info
+// ============================================
+// Video Info & Formats
+// ============================================
+
 ipcMain.handle('get-video-info', async (_, url: string) => {
   return new Promise((resolve, reject) => {
     const ytDlpPath = getYtDlpPath()
     const args = ['--dump-json', '--no-download', '--no-check-certificate', url]
     
-    // Add path if using bundled exe
     const cmd = ytDlpPath.includes('yt-dlp') && !ytDlpPath.endsWith('.exe') ? 'python' : ytDlpPath
     const procArgs = ytDlpPath.includes('yt-dlp') && !ytDlpPath.endsWith('.exe') ? ['-m', 'yt_dlp', ...args] : args
     
@@ -291,7 +332,6 @@ ipcMain.handle('get-video-info', async (_, url: string) => {
   })
 })
 
-// Get available formats
 ipcMain.handle('get-formats', async (_, url: string) => {
   return new Promise((resolve) => {
     const ytDlpPath = getYtDlpPath()
@@ -360,9 +400,18 @@ ipcMain.handle('get-formats', async (_, url: string) => {
   })
 })
 
-// Download video
-ipcMain.handle('download-video', async (_, options: { url: string, formatId: string, outputDir: string }) => {
-  const { url, formatId, outputDir } = options
+// ============================================
+// Download with Trim Support
+// ============================================
+
+ipcMain.handle('download-video', async (_, options: { 
+  url: string, 
+  formatId: string, 
+  outputDir: string,
+  trimStart?: string,
+  trimEnd?: string
+}) => {
+  const { url, formatId, outputDir, trimStart, trimEnd } = options
   
   const isX = url.toLowerCase().includes('twitter.com') || url.toLowerCase().includes('x.com')
   
@@ -370,45 +419,71 @@ ipcMain.handle('download-video', async (_, options: { url: string, formatId: str
     const ytDlpPath = getYtDlpPath()
     let args: string[]
     
-    if (formatId === 'best' || formatId === 'bestvideo') {
+    // Build base args
+    const baseArgs: string[] = ['--no-check-certificate', '-o', path.join(outputDir, '%(title)s.%(ext)s'), '--newline', '--progress']
+    
+    // Check if using trim
+    const isTrimming = !!(trimStart || trimEnd)
+    
+    // If trimming, use single format (not combined) to avoid sync issues
+    if (isTrimming) {
+      if (formatId === 'best' || formatId === 'bestvideo') {
+        // For trim, use best pre-muxed format
+        args = [
+          '-f', 'best[ext=mp4]/best[ext=webm]/best',
+          ...baseArgs,
+          url
+        ]
+      } else if (formatId === 'bestaudio') {
+        args = [
+          '-f', 'bestaudio',
+          ...baseArgs,
+          url
+        ]
+      } else {
+        args = [
+          '-f', formatId,
+          ...baseArgs,
+          url
+        ]
+      }
+    } else if (formatId === 'best' || formatId === 'bestvideo') {
+      // If not trimming, use combined format for best quality
       if (isX) {
         args = [
           '-f', 'bestvideo+bestaudio/best',
-          '--no-check-certificate',
-          '-o', path.join(outputDir, '%(title)s.%(ext)s'),
-          '--newline',
-          '--progress',
+          ...baseArgs,
           '--merge-output-format', 'mp4',
           url
         ]
       } else {
         args = [
           '-f', 'best',
-          '--no-check-certificate',
-          '-o', path.join(outputDir, '%(title)s.%(ext)s'),
-          '--newline',
-          '--progress',
+          ...baseArgs,
           url
         ]
       }
     } else if (formatId === 'bestaudio') {
       args = [
         '-f', 'bestaudio',
-        '--no-check-certificate',
-        '-o', path.join(outputDir, '%(title)s.%(ext)s'),
-        '--newline',
-        '--progress',
+        ...baseArgs,
         url
       ]
     } else {
       args = [
         '-f', formatId,
-        '--no-check-certificate',
-        '-o', path.join(outputDir, '%(title)s.%(ext)s'),
-        '--newline',
-        '--progress',
+        ...baseArgs,
         url
       ]
+    }
+
+    // Add trim support after format selection
+    if (trimStart || trimEnd) {
+      const startTime = trimStart || '0'
+      const endTime = trimEnd || ''
+      const section = endTime ? `${startTime}-${endTime}` : startTime
+      args.push('--download-sections', `*${section}`)
+      log.info('Adding trim section:', section)
     }
 
     log.info('Starting download:', args)
@@ -461,14 +536,136 @@ ipcMain.handle('download-video', async (_, options: { url: string, formatId: str
   })
 })
 
-// Get default download path
+// ============================================
+// Queue Download
+// ============================================
+
+ipcMain.handle('download-from-queue', async (_, item: {
+  url: string
+  formatId: string
+  outputDir: string
+  trimStart?: string
+  trimEnd?: string
+}) => {
+  const { url, formatId, outputDir, trimStart, trimEnd } = item
+  
+  const isX = url.toLowerCase().includes('twitter.com') || url.toLowerCase().includes('x.com')
+  
+  return new Promise((resolve, reject) => {
+    const ytDlpPath = getYtDlpPath()
+    let args: string[]
+    
+    const baseArgs: string[] = ['--no-check-certificate', '-o', path.join(outputDir, '%(title)s.%(ext)s'), '--newline', '--progress']
+    
+    // Check if trimming
+    const isTrimming = !!(trimStart || trimEnd)
+    
+    // If trimming, use single format to avoid sync issues
+    if (isTrimming) {
+      if (formatId === 'best' || formatId === 'bestvideo') {
+        args = [
+          '-f', 'best[ext=mp4]/best[ext=webm]/best',
+          ...baseArgs,
+          url
+        ]
+      } else if (formatId === 'bestaudio') {
+        args = ['-f', 'bestaudio', ...baseArgs, url]
+      } else {
+        args = ['-f', formatId, ...baseArgs, url]
+      }
+    } else if (formatId === 'best' || formatId === 'bestvideo') {
+      if (isX) {
+        args = ['-f', 'bestvideo+bestaudio/best', ...baseArgs, '--merge-output-format', 'mp4', url]
+      } else {
+        args = ['-f', 'best', ...baseArgs, url]
+      }
+    } else if (formatId === 'bestaudio') {
+      args = ['-f', 'bestaudio', ...baseArgs, url]
+    } else {
+      args = ['-f', formatId, ...baseArgs, url]
+    }
+    
+    // Add trim after format selection
+    if (trimStart || trimEnd) {
+      const startTime = trimStart || '0'
+      const endTime = trimEnd || ''
+      const section = endTime ? `${startTime}-${endTime}` : startTime
+      args.push('--download-sections', `*${section}`)
+    }
+
+    const cmd = ytDlpPath.includes('yt-dlp') && !ytDlpPath.endsWith('.exe') ? 'python' : ytDlpPath
+    const procArgs = ytDlpPath.includes('yt-dlp') && !ytDlpPath.endsWith('.exe') ? ['-m', 'yt_dlp', ...args] : args
+    
+    const proc = spawn(cmd, procArgs, { 
+      shell: true,
+      env: { ...process.env, PYTHONPATH: '' } 
+    })
+
+    let finalFilePath = ''
+
+    proc.stdout.on('data', (data) => {
+      const line = data.toString().trim()
+      log.info('Queue download:', line)
+      
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        // Extract filename from output
+        if (line.includes('[download]') && line.includes('%')) {
+          const percentMatch = line.match(/(\d+\.?\d*)%/)
+          if (percentMatch) {
+            mainWindow.webContents.send('queue-progress', { itemId: item.url, progress: parseFloat(percentMatch[1]) })
+          }
+        }
+        
+        mainWindow.webContents.send('download-progress', { filename: line })
+        
+        if (line.includes('Destination:')) {
+          const destMatch = line.match(/Destination:\s*(.+)/)
+          if (destMatch) {
+            finalFilePath = destMatch[1].trim()
+          }
+        }
+        
+        if (line.includes('Deleting') || line.includes('Merging')) {
+          mainWindow.webContents.send('download-complete', 'Download complete!')
+        }
+      }
+    })
+
+    proc.stderr.on('data', (data) => {
+      const line = data.toString().trim()
+      log.warn('Queue download error:', line)
+    })
+
+    proc.on('close', (code) => {
+      if (code === 0) {
+        log.info('Queue download completed')
+        mainWindow?.webContents.send('queue-item-complete', { itemId: item.url, success: true })
+        resolve(finalFilePath || 'Download completed')
+      } else {
+        log.error('Queue download failed:', code)
+        mainWindow?.webContents.send('queue-item-complete', { itemId: item.url, success: false, error: `Failed with code ${code}` })
+        reject(new Error(`Download failed with code ${code}`))
+      }
+    })
+
+    proc.on('error', (err) => {
+      log.error('Queue download error:', err)
+      mainWindow?.webContents.send('queue-item-complete', { itemId: item.url, success: false, error: err.message })
+      reject(err)
+    })
+  })
+})
+
+// ============================================
+// File System
+// ============================================
+
 ipcMain.handle('get-download-path', async () => {
   const downloadsPath = app.getPath('downloads')
   log.info('Downloads path:', downloadsPath)
   return downloadsPath
 })
 
-// Select directory
 ipcMain.handle('select-directory', async () => {
   const result = await dialog.showOpenDialog(mainWindow!, {
     properties: ['openDirectory']
@@ -480,7 +677,6 @@ ipcMain.handle('select-directory', async () => {
   return null
 })
 
-// Open folder in file explorer
 ipcMain.handle('open-folder', async (_, folderPath: string) => {
   try {
     shell.openPath(folderPath)
@@ -489,4 +685,87 @@ ipcMain.handle('open-folder', async (_, folderPath: string) => {
     log.error('Error opening folder:', err)
     return false
   }
+})
+
+ipcMain.handle('get-file-size', async (_, filePath: string) => {
+  try {
+    const stats = fs.statSync(filePath)
+    return stats.size
+  } catch (err) {
+    log.error('Error getting file size:', err)
+    return 0
+  }
+})
+
+// ============================================
+// History Management
+// ============================================
+
+ipcMain.handle('add-to-history', async (_, item: Omit<HistoryItem, 'id' | 'downloadedAt'>) => {
+  const history = store.get('history', [])
+  const newItem: HistoryItem = {
+    ...item,
+    id: generateId(),
+    downloadedAt: new Date().toISOString()
+  }
+  
+  // Keep only last 100 items
+  const updatedHistory = [newItem, ...history].slice(0, 100)
+  store.set('history', updatedHistory)
+  log.info('Added to history:', newItem.title)
+})
+
+ipcMain.handle('get-history', async () => {
+  return store.get('history', [])
+})
+
+ipcMain.handle('clear-history', async () => {
+  store.set('history', [])
+  log.info('History cleared')
+})
+
+ipcMain.handle('remove-from-history', async (_, id: string) => {
+  const history = store.get('history', [])
+  const updated = history.filter(item => item.id !== id)
+  store.set('history', updated)
+  log.info('Removed from history:', id)
+})
+
+// ============================================
+// Favorites Management
+// ============================================
+
+ipcMain.handle('add-to-favorites', async (_, item: Omit<FavoriteItem, 'id' | 'addedAt'>) => {
+  const favorites = store.get('favorites', [])
+  
+  // Check if already exists
+  if (favorites.some(f => f.url === item.url)) {
+    return
+  }
+  
+  const newItem: FavoriteItem = {
+    ...item,
+    id: generateId(),
+    addedAt: new Date().toISOString()
+  }
+  
+  const updated = [newItem, ...favorites]
+  store.set('favorites', updated)
+  log.info('Added to favorites:', newItem.title)
+})
+
+ipcMain.handle('get-favorites', async () => {
+  return store.get('favorites', [])
+})
+
+ipcMain.handle('remove-from-favorites', async (_, id: string) => {
+  const favorites = store.get('favorites', [])
+  const updated = favorites.filter(item => item.id !== id)
+  store.set('favorites', updated)
+  log.info('Removed from favorites:', id)
+})
+
+ipcMain.handle('is-favorite', async (_, url: string) => {
+  const favorites = store.get('favorites', [])
+  return favorites.some(f => f.url === url)
 })
