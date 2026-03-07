@@ -362,4 +362,11 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 
-.opencode/*
+.opencode/
+
+# Video Downloader specific
+resources/
+dist-electron/
+release/
+*.zip
+!node_modules/**
