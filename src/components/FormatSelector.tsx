@@ -9,133 +9,200 @@ interface FormatSelectorProps {
 export default function FormatSelector({ formats, selectedFormat, onSelect }: FormatSelectorProps) {
   // Group formats by type
   const videoFormats = formats.filter(f => f.ext === 'mp4' || f.ext === 'webm')
-  const audioFormats = formats.filter(f => f.ext === 'm4a' || f.ext === 'mp3')
+  const audioFormats = formats.filter(f => f.ext === 'm4a' || f.ext === 'mp3' || f.ext === 'aac' || f.ext === 'ogg')
+  
+  // Get best available resolution for sorting
+  const getResolutionValue = (res: string) => {
+    const match = res.match(/(\d+)/)
+    return match ? parseInt(match[1]) : 0
+  }
+
+  // Sort video formats by resolution (highest first)
+  const sortedVideoFormats = [...videoFormats].sort((a, b) => 
+    getResolutionValue(b.resolution) - getResolutionValue(a.resolution)
+  )
+
+  // Get top 6 video resolutions
+  const topVideoFormats = sortedVideoFormats.slice(0, 6)
 
   return (
     <div>
       {/* Section Label */}
       <label className="swiss-type-caption" style={{ display: 'block', marginBottom: '12px', color: '#6B7280' }}>
-        Select Quality
+        Download Options
       </label>
 
-      {/* Quick Options - Soft Toggle Style */}
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+      {/* Main Options - Three Categories */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '24px' }}>
+        {/* Video + Audio (Best) */}
         <button
           onClick={() => onSelect('best')}
           style={{
-            padding: '10px 18px',
-            fontSize: '0.85rem',
-            fontWeight: '500',
-            border: selectedFormat === 'best' ? '1px solid #2563EB' : '1px solid #E5E7EB',
-            borderRadius: '6px',
-            backgroundColor: selectedFormat === 'best' ? '#2563EB' : '#FFFFFF',
-            color: selectedFormat === 'best' ? '#FFFFFF' : '#4B5563',
+            flex: 1,
+            padding: '16px',
+            textAlign: 'center',
+            border: selectedFormat === 'best' ? '2px solid #2563EB' : '1px solid #E5E7EB',
+            borderRadius: '10px',
+            backgroundColor: selectedFormat === 'best' ? '#EFF6FF' : '#FFFFFF',
             cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            boxShadow: selectedFormat === 'best' ? '0 2px 6px rgba(37, 99, 235, 0.25)' : 'none'
+            transition: 'all 0.2s ease'
           }}
         >
-          Best Quality (MP4)
+          <div style={{ marginBottom: '6px' }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={selectedFormat === 'best' ? '#2563EB' : '#6B7280'} strokeWidth="2" style={{ margin: '0 auto' }}>
+              <polygon points="5 3 19 12 5 21 5 3" />
+            </svg>
+          </div>
+          <div style={{ fontSize: '0.85rem', fontWeight: '600', color: selectedFormat === 'best' ? '#2563EB' : '#1F2937', marginBottom: '2px' }}>
+            Video + Audio
+          </div>
+          <div style={{ fontSize: '0.75rem', color: selectedFormat === 'best' ? '#2563EB' : '#9CA3AF' }}>
+            Best Quality (MP4)
+          </div>
         </button>
+
+        {/* Video Only */}
+        <button
+          onClick={() => onSelect('bestvideo')}
+          style={{
+            flex: 1,
+            padding: '16px',
+            textAlign: 'center',
+            border: selectedFormat === 'bestvideo' ? '2px solid #2563EB' : '1px solid #E5E7EB',
+            borderRadius: '10px',
+            backgroundColor: selectedFormat === 'bestvideo' ? '#EFF6FF' : '#FFFFFF',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <div style={{ marginBottom: '6px' }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={selectedFormat === 'bestvideo' ? '#2563EB' : '#6B7280'} strokeWidth="2" style={{ margin: '0 auto' }}>
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+              <line x1="8" y1="21" x2="16" y2="21" />
+              <line x1="12" y1="17" x2="12" y2="21" />
+            </svg>
+          </div>
+          <div style={{ fontSize: '0.85rem', fontWeight: '600', color: selectedFormat === 'bestvideo' ? '#2563EB' : '#1F2937', marginBottom: '2px' }}>
+            Video Only
+          </div>
+          <div style={{ fontSize: '0.75rem', color: selectedFormat === 'bestvideo' ? '#2563EB' : '#9CA3AF' }}>
+            No Audio Track
+          </div>
+        </button>
+
+        {/* Audio Only */}
         <button
           onClick={() => onSelect('bestaudio')}
           style={{
-            padding: '10px 18px',
-            fontSize: '0.85rem',
-            fontWeight: '500',
-            border: selectedFormat === 'bestaudio' ? '1px solid #2563EB' : '1px solid #E5E7EB',
-            borderRadius: '6px',
-            backgroundColor: selectedFormat === 'bestaudio' ? '#2563EB' : '#FFFFFF',
-            color: selectedFormat === 'bestaudio' ? '#FFFFFF' : '#4B5563',
+            flex: 1,
+            padding: '16px',
+            textAlign: 'center',
+            border: selectedFormat === 'bestaudio' ? '2px solid #2563EB' : '1px solid #E5E7EB',
+            borderRadius: '10px',
+            backgroundColor: selectedFormat === 'bestaudio' ? '#EFF6FF' : '#FFFFFF',
             cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            boxShadow: selectedFormat === 'bestaudio' ? '0 2px 6px rgba(37, 99, 235, 0.25)' : 'none'
+            transition: 'all 0.2s ease'
           }}
         >
-          Audio Only
+          <div style={{ marginBottom: '6px' }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={selectedFormat === 'bestaudio' ? '#2563EB' : '#6B7280'} strokeWidth="2" style={{ margin: '0 auto' }}>
+              <path d="M9 18V5l12-2v13" />
+              <circle cx="6" cy="18" r="3" />
+              <circle cx="18" cy="16" r="3" />
+            </svg>
+          </div>
+          <div style={{ fontSize: '0.85rem', fontWeight: '600', color: selectedFormat === 'bestaudio' ? '#2563EB' : '#1F2937', marginBottom: '2px' }}>
+            Audio Only
+          </div>
+          <div style={{ fontSize: '0.75rem', color: selectedFormat === 'bestaudio' ? '#2563EB' : '#9CA3AF' }}>
+            MP3 / M4A
+          </div>
         </button>
       </div>
 
-      {/* Video Formats Grid */}
-      {videoFormats.length > 0 && (
+      {/* Custom Resolution Selection */}
+      {selectedFormat !== 'bestaudio' && topVideoFormats.length > 0 && (
         <div style={{ marginBottom: '20px' }}>
-          <h3 className="swiss-type-caption" style={{ marginBottom: '10px', color: '#9CA3AF' }}>
-            Video (Manual)
+          <h3 className="swiss-type-caption" style={{ marginBottom: '12px', color: '#9CA3AF', fontWeight: '500' }}>
+            Or Select Resolution
           </h3>
           <div style={{ 
             display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', 
+            gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', 
             gap: '8px' 
           }}>
-            {videoFormats.slice(0, 12).map((format) => (
-              <button
-                key={format.format_id}
-                onClick={() => onSelect(format.format_id)}
-                style={{
-                  padding: '12px',
-                  textAlign: 'left',
-                  border: selectedFormat === format.format_id ? '1px solid #2563EB' : '1px solid #E5E7EB',
-                  borderRadius: '6px',
-                  backgroundColor: selectedFormat === format.format_id ? '#2563EB' : '#FFFFFF',
-                  color: selectedFormat === format.format_id ? '#FFFFFF' : '#4B5563',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  boxShadow: selectedFormat === format.format_id ? '0 2px 6px rgba(37, 99, 235, 0.25)' : 'none'
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>{format.resolution}</span>
-                  <span style={{ fontSize: '0.7rem', fontWeight: '600', opacity: 0.7 }}>{format.ext.toUpperCase()}</span>
-                </div>
-                {format.filesize && format.filesize !== 'Unknown' && (
-                  <span style={{ fontSize: '0.75rem', opacity: selectedFormat === format.format_id ? 0.8 : 0.5 }}>
-                    {format.filesize}
-                  </span>
-                )}
-              </button>
-            ))}
+            {topVideoFormats.map((format) => {
+              const isSelected = selectedFormat === format.format_id
+              return (
+                <button
+                  key={format.format_id}
+                  onClick={() => onSelect(format.format_id)}
+                  style={{
+                    padding: '12px 8px',
+                    textAlign: 'center',
+                    border: isSelected ? '2px solid #2563EB' : '1px solid #E5E7EB',
+                    borderRadius: '8px',
+                    backgroundColor: isSelected ? '#EFF6FF' : '#FFFFFF',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <div style={{ fontSize: '0.9rem', fontWeight: '600', color: isSelected ? '#2563EB' : '#1F2937' }}>
+                    {format.resolution}
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: isSelected ? '#2563EB' : '#9CA3AF', marginTop: '2px' }}>
+                    {format.ext.toUpperCase()}
+                  </div>
+                  {format.filesize && format.filesize !== 'Unknown' && (
+                    <div style={{ fontSize: '0.65rem', color: '#9CA3AF', marginTop: '4px' }}>
+                      {format.filesize}
+                    </div>
+                  )}
+                </button>
+              )
+            })}
           </div>
         </div>
       )}
 
-      {/* Audio Formats Grid */}
-      {audioFormats.length > 0 && (
+      {/* Audio Formats - When Audio Only Selected */}
+      {selectedFormat === 'bestaudio' && audioFormats.length > 0 && (
         <div>
-          <h3 className="swiss-type-caption" style={{ marginBottom: '10px', color: '#9CA3AF' }}>
-            Audio Only (Manual)
+          <h3 className="swiss-type-caption" style={{ marginBottom: '12px', color: '#9CA3AF', fontWeight: '500' }}>
+            Select Audio Format
           </h3>
           <div style={{ 
             display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', 
+            gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', 
             gap: '8px' 
           }}>
-            {audioFormats.slice(0, 6).map((format) => (
-              <button
-                key={format.format_id}
-                onClick={() => onSelect(format.format_id)}
-                style={{
-                  padding: '12px',
-                  textAlign: 'left',
-                  border: selectedFormat === format.format_id ? '1px solid #2563EB' : '1px solid #E5E7EB',
-                  borderRadius: '6px',
-                  backgroundColor: selectedFormat === format.format_id ? '#2563EB' : '#FFFFFF',
-                  color: selectedFormat === format.format_id ? '#FFFFFF' : '#4B5563',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  boxShadow: selectedFormat === format.format_id ? '0 2px 6px rgba(37, 99, 235, 0.25)' : 'none'
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>Audio</span>
-                  <span style={{ fontSize: '0.7rem', fontWeight: '600', opacity: 0.7 }}>{format.ext.toUpperCase()}</span>
-                </div>
-                {format.filesize && format.filesize !== 'Unknown' && (
-                  <span style={{ fontSize: '0.75rem', opacity: selectedFormat === format.format_id ? 0.8 : 0.5 }}>
-                    {format.filesize}
-                  </span>
-                )}
-              </button>
-            ))}
+            {audioFormats.slice(0, 4).map((format) => {
+              const isSelected = selectedFormat === format.format_id
+              return (
+                <button
+                  key={format.format_id}
+                  onClick={() => onSelect(format.format_id)}
+                  style={{
+                    padding: '12px 8px',
+                    textAlign: 'center',
+                    border: isSelected ? '2px solid #2563EB' : '1px solid #E5E7EB',
+                    borderRadius: '8px',
+                    backgroundColor: isSelected ? '#EFF6FF' : '#FFFFFF',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <div style={{ fontSize: '0.9rem', fontWeight: '600', color: isSelected ? '#2563EB' : '#1F2937' }}>
+                    {format.ext.toUpperCase()}
+                  </div>
+                  {format.filesize && format.filesize !== 'Unknown' && (
+                    <div style={{ fontSize: '0.65rem', color: '#9CA3AF', marginTop: '4px' }}>
+                      {format.filesize}
+                    </div>
+                  )}
+                </button>
+              )
+            })}
           </div>
         </div>
       )}

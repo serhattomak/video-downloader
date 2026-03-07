@@ -568,12 +568,19 @@ function App() {
                   formats={videoData.formats}
                   selectedFormat={selectedFormat?.format_id || ''}
                   onSelect={(formatId) => {
-                    // If selecting 'best' or 'bestaudio', create a virtual format
+                    // If selecting 'best', 'bestvideo', or 'bestaudio', create a virtual format
                     if (formatId === 'best') {
                       setSelectedFormat({
                         format_id: 'best',
                         ext: 'mp4',
                         resolution: 'Best Quality',
+                        filesize: ''
+                      })
+                    } else if (formatId === 'bestvideo') {
+                      setSelectedFormat({
+                        format_id: 'bestvideo',
+                        ext: 'mp4',
+                        resolution: 'Video Only',
                         filesize: ''
                       })
                     } else if (formatId === 'bestaudio') {

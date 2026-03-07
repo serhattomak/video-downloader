@@ -447,8 +447,8 @@ ipcMain.handle('download-video', async (_, options: {
           url
         ]
       }
-    } else if (formatId === 'best' || formatId === 'bestvideo') {
-      // If not trimming, use combined format for best quality
+    } else if (formatId === 'best') {
+      // Best quality with audio
       if (isX) {
         args = [
           '-f', 'bestvideo+bestaudio/best',
@@ -463,9 +463,10 @@ ipcMain.handle('download-video', async (_, options: {
           url
         ]
       }
-    } else if (formatId === 'bestaudio') {
+    } else if (formatId === 'bestvideo') {
+      // Video only (no audio)
       args = [
-        '-f', 'bestaudio',
+        '-f', 'bestvideo',
         ...baseArgs,
         url
       ]
@@ -573,12 +574,16 @@ ipcMain.handle('download-from-queue', async (_, item: {
       } else {
         args = ['-f', formatId, ...baseArgs, url]
       }
-    } else if (formatId === 'best' || formatId === 'bestvideo') {
+    } else if (formatId === 'best') {
+      // Best quality with audio
       if (isX) {
         args = ['-f', 'bestvideo+bestaudio/best', ...baseArgs, '--merge-output-format', 'mp4', url]
       } else {
         args = ['-f', 'best', ...baseArgs, url]
       }
+    } else if (formatId === 'bestvideo') {
+      // Video only
+      args = ['-f', 'bestvideo', ...baseArgs, url]
     } else if (formatId === 'bestaudio') {
       args = ['-f', 'bestaudio', ...baseArgs, url]
     } else {
