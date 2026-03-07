@@ -370,3 +370,4 @@ dist-electron/
 release/
 *.zip
 !node_modules/**
+ffmpeg.exe

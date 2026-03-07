@@ -182,6 +182,20 @@ function getYtDlpPath(): string {
   return 'yt-dlp'
 }
 
+function getFFmpegPath(): string {
+  const appDir = isDev 
+    ? path.join(process.cwd(), 'resources')
+    : path.join(__dirname, '..')
+  
+  const bundledPath = path.join(appDir, 'ffmpeg.exe')
+  if (fs.existsSync(bundledPath)) {
+    log.info('Using bundled ffmpeg:', bundledPath)
+    return bundledPath
+  }
+  
+  return 'ffmpeg'
+}
+
 ipcMain.handle('check-yt-dlp', async () => {
   return new Promise((resolve) => {
     const ytDlpPath = getYtDlpPath()
@@ -267,7 +281,8 @@ ipcMain.handle('install-yt-dlp', async () => {
 ipcMain.handle('get-video-info', async (_, url: string) => {
   return new Promise((resolve, reject) => {
     const ytDlpPath = getYtDlpPath()
-    const args = ['--dump-json', '--no-download', '--no-check-certificate', url]
+    // Add --js-runtimes to enable JavaScript runtime for YouTube extraction
+    const args = ['--dump-json', '--no-download', '--no-check-certificate', '--js-runtimes', 'node', url]
     
     const cmd = ytDlpPath.includes('yt-dlp') && !ytDlpPath.endsWith('.exe') ? 'python' : ytDlpPath
     const procArgs = ytDlpPath.includes('yt-dlp') && !ytDlpPath.endsWith('.exe') ? ['-m', 'yt_dlp', ...args] : args
@@ -335,7 +350,8 @@ ipcMain.handle('get-video-info', async (_, url: string) => {
 ipcMain.handle('get-formats', async (_, url: string) => {
   return new Promise((resolve) => {
     const ytDlpPath = getYtDlpPath()
-    const args = ['-F', '--no-check-certificate', url]
+    // Add --js-runtimes to enable JavaScript runtime for YouTube extraction
+    const args = ['-F', '--no-check-certificate', '--js-runtimes', 'node', url]
     
     const cmd = ytDlpPath.includes('yt-dlp') && !ytDlpPath.endsWith('.exe') ? 'python' : ytDlpPath
     const procArgs = ytDlpPath.includes('yt-dlp') && !ytDlpPath.endsWith('.exe') ? ['-m', 'yt_dlp', ...args] : args
@@ -448,21 +464,12 @@ ipcMain.handle('download-video', async (_, options: {
         ]
       }
     } else if (formatId === 'best') {
-      // Best quality with audio
-      if (isX) {
-        args = [
-          '-f', 'bestvideo+bestaudio/best',
-          ...baseArgs,
-          '--merge-output-format', 'mp4',
-          url
-        ]
-      } else {
-        args = [
-          '-f', 'best',
-          ...baseArgs,
-          url
-        ]
-      }
+      // Best quality with audio - use bestvideo+bestaudio for highest quality
+      args = [
+        '-f', 'bestvideo+bestaudio/best',
+        ...baseArgs,
+        url
+      ]
     } else if (formatId === 'bestvideo') {
       // Video only (no audio)
       args = [
@@ -476,6 +483,13 @@ ipcMain.handle('download-video', async (_, options: {
         ...baseArgs,
         url
       ]
+    }
+
+    // Add ffmpeg location for video merging
+    const ffmpegPath = getFFmpegPath()
+    if (ffmpegPath !== 'ffmpeg') {
+      args.push('--ffmpeg-location', ffmpegPath)
+      log.info('Using ffmpeg at:', ffmpegPath)
     }
 
     // Add trim support after format selection
@@ -575,12 +589,8 @@ ipcMain.handle('download-from-queue', async (_, item: {
         args = ['-f', formatId, ...baseArgs, url]
       }
     } else if (formatId === 'best') {
-      // Best quality with audio
-      if (isX) {
-        args = ['-f', 'bestvideo+bestaudio/best', ...baseArgs, '--merge-output-format', 'mp4', url]
-      } else {
-        args = ['-f', 'best', ...baseArgs, url]
-      }
+      // Best quality with audio - use bestvideo+bestaudio for highest quality
+      args = ['-f', 'bestvideo+bestaudio/best', ...baseArgs, url]
     } else if (formatId === 'bestvideo') {
       // Video only
       args = ['-f', 'bestvideo', ...baseArgs, url]
@@ -590,6 +600,12 @@ ipcMain.handle('download-from-queue', async (_, item: {
       args = ['-f', formatId, ...baseArgs, url]
     }
     
+    // Add ffmpeg location for video merging
+    const ffmpegPath = getFFmpegPath()
+    if (ffmpegPath !== 'ffmpeg') {
+      args.push('--ffmpeg-location', ffmpegPath)
+    }
+
     // Add trim after format selection
     if (trimStart || trimEnd) {
       const startTime = trimStart || '0'
