@@ -22,8 +22,62 @@ export default function FormatSelector({ formats, selectedFormat, onSelect }: Fo
     getResolutionValue(b.resolution) - getResolutionValue(a.resolution)
   )
 
-  // Get top 6 video resolutions
-  const topVideoFormats = sortedVideoFormats.slice(0, 6)
+  // Get unique resolutions (one per resolution value)
+  const uniqueVideoFormats = sortedVideoFormats.filter((format, index, self) =>{
+    // Normalize resolution for comparison (extract height)
+    const getHeight = (res: string) => {
+      if (res === 'Unknown') return 0
+      if (res === 'Audio') return 0
+      
+      // Handle "1920x1080" or "1080x1920" -> take the larger number
+      const parts = res.toLowerCase().split('x')
+      if (parts.length === 2) {
+        const w = parseInt(parts[0].match(/\d+/)?.[0] || '0')
+        const h = parseInt(parts[1].match(/\d+/)?.[0] || '0')
+        return Math.max(w, h)
+      }
+      
+      // Handle "1080p" or "4k"
+      const numMatch = res.match(/(\d{3,4})/)
+      return numMatch ? parseInt(numMatch[1]) : 0
+    }
+    
+    const currentHeight = getHeight(format.resolution)
+    
+    // Find if we already have this resolution
+    const existingIndex = self.findIndex((t) => {
+      const otherHeight = getHeight(t.resolution)
+      return otherHeight === currentHeight && currentHeight > 0
+    })
+    
+    // Keep the first occurrence of each resolution
+    return existingIndex === index || currentHeight === 0
+  })
+
+  // Sort by height (highest first) with proper handling
+  const sortedByHeight = [...uniqueVideoFormats].sort((a, b) =>{
+    const getHeight = (res: string) =>{
+      if (res === 'Unknown') return 0
+      if (res === 'Audio') return 0
+      
+      // For "1920x1080" -> 1080 (height)
+      const parts = res.toLowerCase().split('x')
+      if (parts.length === 2) {
+        const w = parseInt(parts[0].match(/\d+/)?.[0] || '0')
+        const h = parseInt(parts[1].match(/\d+/)?.[0] || '0')
+        // Take the larger value (standardizes vertical/horizontal videos)
+        return Math.max(w, h)
+      }
+      
+      // For "1080p" -> 1080
+      const numMatch = res.match(/(\d{3,4})/)
+      return numMatch ? parseInt(numMatch[1]) : 0
+    }
+    return getHeight(b.resolution) - getHeight(a.resolution)
+  })
+
+  // Get all unique resolutions
+  const topVideoFormats = sortedByHeight
 
   return (
     <div>

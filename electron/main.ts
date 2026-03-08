@@ -372,37 +372,94 @@ ipcMain.handle('get-formats', async (_, url: string) => {
         const lines = output.split('\n')
         const formats: Array<{format_id: string, ext: string, resolution: string, filesize: string, note?: string}> = []
         
-        for (const line of lines) {
-          if (line.length > 40 && /^\d/.test(line)) {
-            const formatMatch = line.match(/^(\d+)/)
-            if (!formatMatch) continue
-            
-            const formatId = formatMatch[1]
-            const extMatch = line.match(/\s(mp4|webm|m4a|mp3|aac|ogg)\s/i)
-            const ext = extMatch ? extMatch[1].toLowerCase() : 'unknown'
-            
-            const resMatch = line.match(/(\d+x\d+|\d+p)/i)
-            const resolution = resMatch ? resMatch[1] : (ext === 'm4a' || ext === 'mp3' ? 'Audio' : 'Unknown')
-            
-            const sizeMatch = line.match(/(\d+\.?\d*\s*[KMGT]iB?)/i)
-            const filesize = sizeMatch ? sizeMatch[1] : 'Unknown'
-            
-            const noteMatch = line.match(/\[(.*?)\]/)
-            const note = noteMatch ? noteMatch[1] : ''
-            
-            if (['mp4', 'webm', 'm4a', 'mp3', 'aac', 'ogg'].includes(ext)) {
-              formats.push({
-                format_id: formatId,
-                ext,
-                resolution,
-                filesize,
-                note
-              })
-            }
-          }
-        }
-        
-        resolve(formats.slice(0, 25))
+         for (const line of lines) {
+           // Skip table header lines
+           if (line.includes('ID') && line.includes('EXT') && line.includes('RESOLUTION')) continue
+           if (line.includes('---')) continue
+           
+           // More flexible format ID matching (handles IDs like "137", "22", "sb0", etc.)
+           const formatMatch = line.match(/^(\S+)/)
+           if (!formatMatch) continue
+           
+           const formatId = formatMatch[1]
+           
+           // Skip non-video/audio formats (thumbnails, subtitles, etc.)
+           if (formatId.startsWith('sb') || formatId.startsWith('ws')) continue
+           
+           // Try to extract extension from various patterns in yt-dlp output
+           let ext = 'unknown'
+           const extPatterns = [
+             /\s(mp4)\s/i,
+             /\s(webm)\s/i,
+             /\s(m4a)\s/i,
+             /\s(mp3)\s/i,
+             /\s(aac)\s/i,
+             /\s(ogg)\s/i,
+             /\s(mov)\s/i,
+             /\s(flac)\s/i,
+             /\s(wav)\s/i
+           ]
+           
+           for (const pattern of extPatterns) {
+             const match = line.match(pattern)
+             if (match) {
+               ext = match[1].toLowerCase()
+               break
+             }
+           }
+           
+           // Extract resolution - try multiple patterns
+           // yt-dlp shows resolution in different places: "1920x1080", "1080p", "1080x1920" (vertical)
+           let resolution = 'Unknown'
+           const resPatterns = [
+             /(\d{3,4}x\d{3,4})/i,      // 1920x1080, 1080x1920
+             /(\d{3,4}p)/i,              // 1080p, 720p
+             /(\d+k)/i                   // 4k, 8k
+           ]
+           
+           for (const pattern of resPatterns) {
+             const match = line.match(pattern)
+             if (match) {
+               resolution = match[1]
+               break
+             }
+           }
+           
+           // Mark audio-only formats
+           if (!resolution.match(/\d{3,4}/) && (ext === 'm4a' || ext === 'mp3' || ext === 'aac' || ext === 'ogg' || ext === 'flac' || ext === 'wav')) {
+             resolution = 'Audio'
+           }
+           
+           const sizeMatch = line.match(/(\d+\.?\d*\s*[KMGT]iB?)/i)
+           const filesize = sizeMatch ? sizeMatch[1] : 'Unknown'
+           
+           const noteMatch = line.match(/\[(.*?)\]/)
+           const note = noteMatch ? noteMatch[1] : ''
+           
+           // Include video and audio formats
+           if (ext !== 'unknown' && !formatId.startsWith('sb') && !formatId.startsWith('ws')) {
+             formats.push({
+               format_id: formatId,
+               ext,
+               resolution,
+               filesize,
+               note
+             })
+           }
+         }
+         
+         // Return all formats sorted by resolution (higher first)
+         const sortedFormats = formats.sort((a, b) => {
+           const getResValue = (res: string) => {
+             if (res === 'Audio') return 0
+             if (res === 'Unknown') return -1
+             const match = res.match(/(\d+)/)
+             return match ? parseInt(match[1]) : 0
+           }
+           return getResValue(b.resolution) - getResValue(a.resolution)
+         })
+         
+         resolve(sortedFormats.slice(0, 50))
       } else {
         log.error('Get formats failed:', output)
         resolve([])
