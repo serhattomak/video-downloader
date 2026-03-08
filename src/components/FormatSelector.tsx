@@ -11,73 +11,107 @@ export default function FormatSelector({ formats, selectedFormat, onSelect }: Fo
   const videoFormats = formats.filter(f => f.ext === 'mp4' || f.ext === 'webm')
   const audioFormats = formats.filter(f => f.ext === 'm4a' || f.ext === 'mp3' || f.ext === 'aac' || f.ext === 'ogg')
   
-  // Get best available resolution for sorting
-  const getResolutionValue = (res: string) => {
-    const match = res.match(/(\d+)/)
-    return match ? parseInt(match[1]) : 0
-  }
+  // Parse resolution string to get height
+  const parseResolution = (res: string): number => {
+    if (!res || res === 'Unknown' || res === 'Audio') return 0;
+    
+    // Handle "1920x1080" format - extract height (second number)
+    if (res.includes('x')) {
+      const parts = res.toLowerCase().split('x');
+      if (parts.length === 2) {
+        // For "1920x1080" -> 1080 (height)
+        // For "1080x1920" (vertical video) -> 1920 (height)
+        // Height is always the second number in standard "widthxheight" notation
+        const height = parseInt(parts[1].match(/\d+/)?.[0] || '0');
+        return height;
+      }
+    }
+    
+    // Handle "1080p" or "720p" format
+    const match = res.match(/(\d{3,4})p?/i);
+    return match ? parseInt(match[1]) : 0;
+  };
 
   // Sort video formats by resolution (highest first)
-  const sortedVideoFormats = [...videoFormats].sort((a, b) => 
-    getResolutionValue(b.resolution) - getResolutionValue(a.resolution)
-  )
+  const sortedVideoFormats = [...videoFormats].sort((a, b) => {
+    const heightA = parseResolution(a.resolution);
+    const heightB = parseResolution(b.resolution);
+    return heightB - heightA;
+  });
 
-  // Get unique resolutions (one per resolution value)
-  const uniqueVideoFormats = sortedVideoFormats.filter((format, index, self) =>{
-    // Normalize resolution for comparison (extract height)
-    const getHeight = (res: string) => {
-      if (res === 'Unknown') return 0
-      if (res === 'Audio') return 0
-      
-      // Handle "1920x1080" or "1080x1920" -> take the larger number
-      const parts = res.toLowerCase().split('x')
-      if (parts.length === 2) {
-        const w = parseInt(parts[0].match(/\d+/)?.[0] || '0')
-        const h = parseInt(parts[1].match(/\d+/)?.[0] || '0')
-        return Math.max(w, h)
-      }
-      
-      // Handle "1080p" or "4k"
-      const numMatch = res.match(/(\d{3,4})/)
-      return numMatch ? parseInt(numMatch[1]) : 0
-    }
+  // Get unique resolutions (one per resolution height) - prioritize mp4 over webm
+  const uniqueVideoFormats = sortedVideoFormats.filter((format, index, self) => {
+    const currentHeight = parseResolution(format.resolution);
     
-    const currentHeight = getHeight(format.resolution)
-    
-    // Find if we already have this resolution
+    // Find if we already have this height
     const existingIndex = self.findIndex((t) => {
-      const otherHeight = getHeight(t.resolution)
-      return otherHeight === currentHeight && currentHeight > 0
-    })
+      const otherHeight = parseResolution(t.resolution);
+      return otherHeight === currentHeight && currentHeight > 0;
+    });
     
-    // Keep the first occurrence of each resolution
-    return existingIndex === index || currentHeight === 0
-  })
+    // Keep the first occurrence of each height
+    return existingIndex === index || currentHeight === 0;
+  });
 
-  // Sort by height (highest first) with proper handling
-  const sortedByHeight = [...uniqueVideoFormats].sort((a, b) =>{
-    const getHeight = (res: string) =>{
-      if (res === 'Unknown') return 0
-      if (res === 'Audio') return 0
-      
-      // For "1920x1080" -> 1080 (height)
-      const parts = res.toLowerCase().split('x')
-      if (parts.length === 2) {
-        const w = parseInt(parts[0].match(/\d+/)?.[0] || '0')
-        const h = parseInt(parts[1].match(/\d+/)?.[0] || '0')
-        // Take the larger value (standardizes vertical/horizontal videos)
-        return Math.max(w, h)
-      }
-      
-      // For "1080p" -> 1080
-      const numMatch = res.match(/(\d{3,4})/)
-      return numMatch ? parseInt(numMatch[1]) : 0
+  // Already sorted from above, just use as-is
+  const topVideoFormats = uniqueVideoFormats;
+  
+  // Check if "Video + Audio" mode or a combined format is active
+  const isVideoAudioMode = selectedFormat === 'best' || selectedFormat?.includes('+bestaudio')
+  
+  // Extract base format ID for selection checking
+  const getBaseFormatId = (formatId: string) => {
+    if (formatId.includes('+')) {
+      return formatId.split('+')[0]
     }
-    return getHeight(b.resolution) - getHeight(a.resolution)
-  })
-
-  // Get all unique resolutions
-  const topVideoFormats = sortedByHeight
+    return formatId
+  }
+  
+  const currentBaseFormatId = getBaseFormatId(selectedFormat)
+  
+  // Handle resolution selection in Video + Audio mode
+  const handleVideoAudioResolutionSelect = (format: VideoFormat) => {
+    // Get the height from resolution
+    const height = parseResolution(format.resolution);
+    
+    // Get all video formats
+    const videoOnlyFormats = formats.filter(f => f.ext === 'mp4' || f.ext === 'webm');
+    
+    // Get the best format for this height - prefer mp4, then take the highest bitrate
+    const matchingFormats = videoOnlyFormats.filter(f => {
+      const h = parseResolution(f.resolution);
+      return h === height;
+    });
+    
+    // Sort by format_id (higher = usually better quality for same resolution)
+    matchingFormats.sort((a, b) => parseInt(b.format_id) - parseInt(a.format_id));
+    
+    // Get audio format - prefer m4a (AAC) which is most compatible
+    const audioFormats = formats.filter(f => 
+      f.ext === 'm4a' || f.ext === 'mp3' || f.ext === 'aac' || f.ext === 'ogg'
+    );
+    
+    // Get the best audio format ID
+    let audioFormatId = 'bestaudio';
+    if (audioFormats.length > 0) {
+      // Try to get m4a first (most compatible)
+      const m4aFormat = audioFormats.find(f => f.ext === 'm4a');
+      if (m4aFormat) {
+        audioFormatId = m4aFormat.format_id;
+      }
+    }
+    
+    if (height > 0 && matchingFormats.length > 0) {
+      // Use specific video + audio format IDs
+      const videoFormatId = matchingFormats[0].format_id;
+      const combinedFormatId = `${videoFormatId}+${audioFormatId}`;
+      console.log('Resolution selected:', format.resolution, 'Height:', height, 'Video ID:', videoFormatId, 'Audio ID:', audioFormatId, 'Combined:', combinedFormatId);
+      onSelect(combinedFormatId);
+    } else {
+      // Fallback to best
+      onSelect('best');
+    }
+  }
 
   return (
     <div>
@@ -175,10 +209,10 @@ export default function FormatSelector({ formats, selectedFormat, onSelect }: Fo
       </div>
 
       {/* Custom Resolution Selection */}
-      {selectedFormat !== 'bestaudio' && topVideoFormats.length > 0 && (
+      {topVideoFormats.length > 0 && (
         <div style={{ marginBottom: '20px' }}>
           <h3 className="swiss-type-caption" style={{ marginBottom: '12px', color: '#9CA3AF', fontWeight: '500' }}>
-            Or Select Resolution
+            {selectedFormat === 'bestaudio' ? 'Select Audio Format' : 'Select Resolution'}
           </h3>
           <div style={{ 
             display: 'grid', 
@@ -186,11 +220,24 @@ export default function FormatSelector({ formats, selectedFormat, onSelect }: Fo
             gap: '8px' 
           }}>
             {topVideoFormats.map((format) => {
-              const isSelected = selectedFormat === format.format_id
+              // Check if this resolution is selected
+              // For single format: match format_id directly
+              // For combined format: match base format_id (e.g., "137" matches "137+bestaudio/best")
+              const isSelected = selectedFormat === format.format_id || 
+                                currentBaseFormatId === format.format_id
+              
               return (
                 <button
                   key={format.format_id}
-                  onClick={() => onSelect(format.format_id)}
+                  onClick={() => {
+                    if (isVideoAudioMode) {
+                      // Video + Audio mode: combine selected video with best audio
+                      handleVideoAudioResolutionSelect(format)
+                    } else {
+                      // Video Only mode: use just the video stream
+                      onSelect(format.format_id)
+                    }
+                  }}
                   style={{
                     padding: '12px 8px',
                     textAlign: 'center',

@@ -498,6 +498,9 @@ ipcMain.handle('download-video', async (_, options: {
     // Check if using trim
     const isTrimming = !!(trimStart || trimEnd)
     
+    // Handle combined format IDs (e.g., "137+bestaudio/best")
+    const isCombinedFormat = formatId.includes('+bestaudio') || formatId.includes('/best')
+    
     // If trimming, use single format (not combined) to avoid sync issues
     if (isTrimming) {
       if (formatId === 'best' || formatId === 'bestvideo') {
@@ -514,8 +517,10 @@ ipcMain.handle('download-video', async (_, options: {
           url
         ]
       } else {
+        // For combined formats in trim mode, extract just the video part
+        const videoFormatId = isCombinedFormat ? formatId.split('+')[0] : formatId
         args = [
-          '-f', formatId,
+          '-f', videoFormatId,
           ...baseArgs,
           url
         ]
@@ -534,7 +539,30 @@ ipcMain.handle('download-video', async (_, options: {
         ...baseArgs,
         url
       ]
+    } else if (isCombinedFormat) {
+      // Combined format like "137+bestaudio/best" or "bestvideo[height=1080]+bestaudio"
+      log.info('Combined format detected:', formatId)
+      
+      // Simplify the format - use direct height-based selection
+      let finalFormat = formatId
+      if (formatId.includes('height=')) {
+        // Extract height and create simpler format
+        const heightMatch = formatId.match(/height=(\d+)/)
+        if (heightMatch) {
+          const height = heightMatch[1]
+          // Use simpler format: bestvideo[height=X]+bestaudio
+          finalFormat = `bestvideo[height=${height}]+bestaudio`
+          log.info('Simplified to:', finalFormat)
+        }
+      }
+      
+      args = [
+        '-f', finalFormat,
+        ...baseArgs,
+        url
+      ]
     } else {
+      // Single video format (Video Only mode)
       args = [
         '-f', formatId,
         ...baseArgs,
@@ -632,6 +660,9 @@ ipcMain.handle('download-from-queue', async (_, item: {
     // Check if trimming
     const isTrimming = !!(trimStart || trimEnd)
     
+    // Handle combined format IDs (e.g., "137+bestaudio/best")
+    const isCombinedFormat = formatId.includes('+bestaudio') || formatId.includes('/best')
+    
     // If trimming, use single format to avoid sync issues
     if (isTrimming) {
       if (formatId === 'best' || formatId === 'bestvideo') {
@@ -643,7 +674,9 @@ ipcMain.handle('download-from-queue', async (_, item: {
       } else if (formatId === 'bestaudio') {
         args = ['-f', 'bestaudio', ...baseArgs, url]
       } else {
-        args = ['-f', formatId, ...baseArgs, url]
+        // For combined formats in trim mode, extract just the video part
+        const videoFormatId = isCombinedFormat ? formatId.split('+')[0] : formatId
+        args = ['-f', videoFormatId, ...baseArgs, url]
       }
     } else if (formatId === 'best') {
       // Best quality with audio - use bestvideo+bestaudio for highest quality
@@ -653,7 +686,11 @@ ipcMain.handle('download-from-queue', async (_, item: {
       args = ['-f', 'bestvideo', ...baseArgs, url]
     } else if (formatId === 'bestaudio') {
       args = ['-f', 'bestaudio', ...baseArgs, url]
+    } else if (isCombinedFormat) {
+      // Combined format like "137+bestaudio/best" - use as-is for video+audio
+      args = ['-f', formatId, ...baseArgs, url]
     } else {
+      // Single video format (Video Only mode)
       args = ['-f', formatId, ...baseArgs, url]
     }
     

@@ -568,6 +568,7 @@ function App() {
                   formats={videoData.formats}
                   selectedFormat={selectedFormat?.format_id || ''}
                   onSelect={(formatId) => {
+                    console.log('Format selected:', formatId)
                     // If selecting 'best', 'bestvideo', or 'bestaudio', create a virtual format
                     if (formatId === 'best') {
                       setSelectedFormat({
@@ -590,8 +591,39 @@ function App() {
                         resolution: 'Audio Only',
                         filesize: ''
                       })
+                    } else if (formatId.includes('+bestaudio') || formatId.includes('+')) {
+                      // Combined format - handle both format_id based and height based
+                      let displayResolution = 'Custom + Audio'
+                      
+                      // Check if it's height-based or format ID based
+                      if (formatId.includes('height=')) {
+                        const heightMatch = formatId.match(/height=(\d+)/)
+                        if (heightMatch) {
+                          displayResolution = `${heightMatch[1]}p + Audio`
+                        }
+                      } else {
+                        // Format ID based like "137+140" or "96+bestaudio"
+                        const parts = formatId.split('+')
+                        const videoFormatId = parts[0]
+                        const audioFormatId = parts[1]
+                        
+                        // Try to find matching video format
+                        const videoFormat = videoData?.formats?.find(f => f.format_id === videoFormatId)
+                        if (videoFormat) {
+                          displayResolution = videoFormat.resolution + ' + Audio'
+                        }
+                        console.log('Format ID based: video:', videoFormatId, 'audio:', audioFormatId, 'display:', displayResolution)
+                      }
+                      
+                      setSelectedFormat({
+                        format_id: formatId,
+                        ext: 'mp4',
+                        resolution: displayResolution,
+                        filesize: ''
+                      })
                     } else {
                       const format = videoData.formats.find(f => f.format_id === formatId)
+                      console.log('Single format selected:', format)
                       if (format) setSelectedFormat(format)
                     }
                   }}
